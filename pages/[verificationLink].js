@@ -17,7 +17,7 @@ export default function VerificationPage({ verification }) {
       await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
       reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
       const redirectUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/${verification.verificationLink}`;
-      reclaimClient.setRedirectUrl(redirectUrl);
+      // reclaimClient.setRedirectUrl(redirectUrl);
       
       const { requestUrl } = await reclaimClient.createVerificationRequest();
       
