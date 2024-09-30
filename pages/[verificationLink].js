@@ -11,13 +11,13 @@ export default function VerificationPage({ verification }) {
   const handleVerify = async () => {
     setIsVerifying(true);
     try {
+      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
+      reclaimClient.setRedirectUrl(redirectUrl);
       const APP_ID = process.env.NEXT_PUBLIC_APP_ID
       const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET
       const reclaimClient = new Reclaim.ProofRequest(APP_ID);
       await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
       reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
-      const redirectUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/${verification.verificationLink}`;
-      // reclaimClient.setRedirectUrl(redirectUrl);
       
       const { requestUrl } = await reclaimClient.createVerificationRequest();
       
