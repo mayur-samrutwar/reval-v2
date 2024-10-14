@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Reclaim } from '@reclaimprotocol/js-sdk';
+import { ReclaimProofRequest } from '@reclaimprotocol/js-sdk';
 import dbConnect from '../lib/dbConnect';
 import Verification from '@/models/Verification';
 
@@ -15,29 +15,33 @@ export default function VerificationPage({ verification }) {
     if (sessionId) {
       console.log('Session ID:', sessionId);
       setSessionId(sessionId);
-      pollStatus(sessionId);
+      startSession(sessionId);
     }
   }, [router.query]);
 
-  const pollStatus = async (sessionId) => {
-    const statusUrl = `https://api.reclaimprotocol.org/api/sdk/session/${sessionId}`;
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch(statusUrl);
-        const data = await response.json();
-        console.log('Status response:', data);
-        if (data.status === 'SUCCESFULL' && data.proof) {
-          clearInterval(pollInterval);
+  const startSession = async (sessionId) => {
+    const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
+    const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
+    const PROVIDER_ID = process.env.NEXT_PUBLIC_APP_PROVIDER;
+
+    try {
+      const reclaimProofRequest = await ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID);
+      
+      await reclaimProofRequest.startSession({
+        onSuccessCallback: (proofs) => {
+          console.log('Verification success', proofs);
           setProofStatus('success');
-          await handleSuccess(data.proof);
-        } else if (data.status === 'FAILED') {
-          clearInterval(pollInterval);
+          handleSuccess(proofs);
+        },
+        onFailureCallback: (error) => {
+          console.error('Verification failed', error);
           setProofStatus('failed');
         }
-      } catch (error) {
-        console.error('Error polling status:', error);
-      }
-    }, 5000); // Poll every 5 seconds
+      });
+    } catch (error) {
+      console.error('Error starting session:', error);
+      setProofStatus('failed');
+    }
   };
 
   const handleSuccess = async (proof) => {
@@ -68,18 +72,14 @@ export default function VerificationPage({ verification }) {
     try {
       const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
       const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
-      const reclaimClient = new Reclaim.ProofRequest(APP_ID);
-      const reclaimClientJson = reclaimClient.toJsonString();
-      const sessionId = JSON.parse(reclaimClientJson).sessionId
-      setSessionId(sessionId)
+      const PROVIDER_ID = process.env.NEXT_PUBLIC_APP_PROVIDER;
+
+      const reclaimProofRequest = await ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID);
+      
       const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
-      reclaimClient.setRedirectUrl(`${redirectUrl}?sessionId=${sessionId}`);
-      await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
-      reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
+      reclaimProofRequest.setRedirectUrl(redirectUrl);
 
-      const { requestUrl } = await reclaimClient.createVerificationRequest();
-
-      // Redirect the user to the Reclaim verification page
+      const requestUrl = await reclaimProofRequest.getRequestUrl();
       window.location.href = requestUrl;
     } catch (error) {
       console.error('Error starting verification:', error);
