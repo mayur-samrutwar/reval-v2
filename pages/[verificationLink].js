@@ -45,10 +45,7 @@ export default function VerificationPage({ verification }) {
       reclaimClient.setRedirectUrl(`https://reval-v2.vercel.app/${verification.verificationLink}/${sessionId}`)
 
       const requestUrl = await reclaimClient.getRequestUrl()
-      const statusUrl = await reclaimClient.getStatusUrl()
-      console.log('requestUrl', requestUrl)
-      console.log('statusUrl', statusUrl)
-
+      window.open(requestUrl)
       await reclaimClient.startSession({
         onSuccess: async (proof) => {
           console.log('Verification success', proof)
