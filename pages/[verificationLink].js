@@ -70,7 +70,7 @@ export default function VerificationPage({ verification }) {
       const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
       const reclaimClient = new Reclaim.ProofRequest(APP_ID);
       const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
-      reclaimClient.setRedirectUrl(`${redirectUrl}?sessionId={sessionId}`);
+      reclaimClient.setRedirectUrl(`${redirectUrl}?sessionId=${sessionId}`);
       await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
       reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
       
