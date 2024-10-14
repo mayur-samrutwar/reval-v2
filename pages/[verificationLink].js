@@ -7,7 +7,7 @@ import Verification from '@/models/Verification';
 export default function VerificationPage({ verification }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [verificationStatus, setVerificationStatus] = useState(verification.verificationStatus);
+  const [proofStatus, setProofStatus] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -28,11 +28,11 @@ export default function VerificationPage({ verification }) {
         console.log('Status response:', data);
         if (data.status === 'SUCCESFULL' && data.proof) {
           clearInterval(pollInterval);
+          setProofStatus('success');
           await handleSuccess(data.proof);
         } else if (data.status === 'FAILED') {
           clearInterval(pollInterval);
-          setIsVerifying(false);
-          alert('Verification failed. Please try again.');
+          setProofStatus('failed');
         }
       } catch (error) {
         console.error('Error polling status:', error);
@@ -51,8 +51,8 @@ export default function VerificationPage({ verification }) {
         }),
       });
       if (res.ok) {
-        setVerificationStatus(true);
-        alert('Verification successful! You have been added to the group.');
+        alert('Verification successful! You can now join the group.');
+        router.push('/');
       } else {
         alert('Error completing verification. Please try again.');
       }
@@ -69,15 +69,15 @@ export default function VerificationPage({ verification }) {
       const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
       const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
       const reclaimClient = new Reclaim.ProofRequest(APP_ID);
-      const redirectUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/${verification.verificationLink}`;
-      reclaimClient.setRedirectUrl(redirectUrl);
+      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
+      reclaimClient.setRedirectUrl(`${redirectUrl}?sessionId={sessionId}`);
       await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
       reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
       
-      const { requestUrl, sessionId } = await reclaimClient.createVerificationRequest();
+      const { requestUrl } = await reclaimClient.createVerificationRequest();
       
-      // Redirect the user to the Reclaim verification page with sessionId
-      window.location.href = `${requestUrl}&redirectUrl=${encodeURIComponent(redirectUrl)}?sessionId=${sessionId}`;
+      // Redirect the user to the Reclaim verification page
+      window.location.href = requestUrl;
     } catch (error) {
       console.error('Error starting verification:', error);
       setIsVerifying(false);
@@ -94,18 +94,26 @@ export default function VerificationPage({ verification }) {
       <h1 className='text-2xl font-semibold'>ReVal Verification</h1>
       <p className='mt-4'>Group ID: {verification.groupId}</p>
       
-      <p>Verification Status: {verificationStatus ? 'Verified' : 'Not Verified'}</p>
+      <p>Verification Status: {verification.verificationStatus ? 'Verified' : 'Not Verified'}</p>
       <p>Verification Type: via GitHub</p>
-      {!verificationStatus && !sessionId && (
+      {!verification.verificationStatus && !sessionId && (
         <button className='mt-4 bg-black text-white px-4 py-2 rounded-lg' onClick={handleVerify} disabled={isVerifying}>
           {isVerifying ? 'Verifying...' : 'Verify with Reclaim'}
         </button>
       )}
-      {sessionId && !verificationStatus && (
+      {sessionId && proofStatus === null && (
         <p>Verification in progress. Please wait...</p>
       )}
-      {verificationStatus && (
-        <p>You have been successfully verified and added to the group.</p>
+      {proofStatus === 'success' && (
+        <p>Verification successful! You can now join the group.</p>
+      )}
+      {proofStatus === 'failed' && (
+        <>
+          <p>Verification failed. Please try again.</p>
+          <button className='mt-4 bg-black text-white px-4 py-2 rounded-lg' onClick={handleVerify}>
+            Retry Verification
+          </button>
+        </>
       )}
     </div>
   );
