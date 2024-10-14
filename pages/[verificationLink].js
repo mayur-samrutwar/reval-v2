@@ -7,80 +7,74 @@ import Verification from '@/models/Verification';
 export default function VerificationPage({ verification }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [proofStatus, setProofStatus] = useState(null);
   const router = useRouter();
 
+  const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
+  const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
+  const PROVIDER_ID = process.env.NEXT_PUBLIC_APP_PROVIDER;
+
   useEffect(() => {
-    const { sessionId } = router.query;
-    if (sessionId) {
-      console.log('Session ID:', sessionId);
-      setSessionId(sessionId);
-      startSession(sessionId);
-    }
-  }, [router.query]);
-
-  const startSession = async (sessionId) => {
-    const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
-    const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
-    const PROVIDER_ID = process.env.NEXT_PUBLIC_APP_PROVIDER;
-
-    try {
-      const reclaimProofRequest = await ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID);
-      
-      await reclaimProofRequest.startSession({
-        onSuccessCallback: (proofs) => {
-          console.log('Verification success', proofs);
-          setProofStatus('success');
-          handleSuccess(proofs);
-        },
-        onFailureCallback: (error) => {
-          console.error('Verification failed', error);
-          setProofStatus('failed');
+    const pollStatusUrl = async () => {
+      if (sessionId) {
+        try {
+          const response = await fetch(`https://api.reclaimprotocol.org/api/sdk/session/${sessionId}`);
+          const data = await response.json();
+          
+          if (data.status === 'successful') {
+            alert('Verification successful! You can now join the group.');
+            router.push('/');
+          }
+        } catch (error) {
+          console.error('Error polling status:', error);
         }
-      });
-    } catch (error) {
-      console.error('Error starting session:', error);
-      setProofStatus('failed');
-    }
-  };
-
-  const handleSuccess = async (proof) => {
-    try {
-      const res = await fetch('/api/completeVerification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          verificationLink: verification.verificationLink,
-          proof: proof
-        }),
-      });
-      if (res.ok) {
-        alert('Verification successful! You can now join the group.');
-        router.push('/');
-      } else {
-        alert('Error completing verification. Please try again.');
       }
-    } catch (error) {
-      console.error('Error handling success:', error);
-      alert('Error completing verification. Please try again.');
-    }
-    setIsVerifying(false);
-  };
+    };
+
+    const intervalId = setInterval(pollStatusUrl, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [sessionId, router]);
 
   const handleVerify = async () => {
     setIsVerifying(true);
     try {
-      const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
-      const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
-      const PROVIDER_ID = process.env.NEXT_PUBLIC_APP_PROVIDER;
+      const reclaimClient = await ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID, { log: false, acceptAiProviders: true })
+      const reclaimClientJson = reclaimClient.toJsonString()
+      const sessionId = JSON.parse(reclaimClientJson).sessionId
+      setSessionId(sessionId)
+      reclaimClient.setRedirectUrl(`https://reval-v2.vercel.app/${verification.verificationLink}/${sessionId}`)
 
-      const reclaimProofRequest = await ReclaimProofRequest.init(APP_ID, APP_SECRET, PROVIDER_ID);
-      
-      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
-      reclaimProofRequest.setRedirectUrl(redirectUrl);
+      const requestUrl = await reclaimClient.getRequestUrl()
+      const statusUrl = await reclaimClient.getStatusUrl()
+      console.log('requestUrl', requestUrl)
+      console.log('statusUrl', statusUrl)
 
-      const requestUrl = await reclaimProofRequest.getRequestUrl();
-      window.location.href = requestUrl;
+      await reclaimClient.startSession({
+        onSuccess: async (proof) => {
+          console.log('Verification success', proof)
+          const res = await fetch('/api/completeVerification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              verificationLink: verification.verificationLink,
+              proof: proof
+            }),
+          });
+          if (res.ok) {
+            alert('Verification successful! You can now join the group.');
+            router.push('/');
+          } else {
+            alert('Error completing verification. Please try again.');
+          }
+          setIsVerifying(false);
+        },
+        onError: error => {
+          console.error('Verification failed', error)
+          console.error('Error handling success:', error);
+          alert('Error completing verification. Please try again.');
+          setIsVerifying(false);
+        }
+      })
     } catch (error) {
       console.error('Error starting verification:', error);
       setIsVerifying(false);
@@ -104,20 +98,6 @@ export default function VerificationPage({ verification }) {
           {isVerifying ? 'Verifying...' : 'Verify with Reclaim'}
         </button>
       )}
-      {sessionId && proofStatus === null && (
-        <p>Verification in progress. Please wait...</p>
-      )}
-      {proofStatus === 'success' && (
-        <p>Verification successful! You can now join the group.</p>
-      )}
-      {proofStatus === 'failed' && (
-        <>
-          <p>Verification failed. Please try again.</p>
-          <button className='mt-4 bg-black text-white px-4 py-2 rounded-lg' onClick={handleVerify}>
-            Retry Verification
-          </button>
-        </>
-      )}
     </div>
   );
 }
@@ -126,7 +106,6 @@ export async function getServerSideProps(context) {
   await dbConnect();
   const { verificationLink } = context.params;
   const verification = await Verification.findOne({ verificationLink });
-
   return {
     props: {
       verification: JSON.parse(JSON.stringify(verification)),
