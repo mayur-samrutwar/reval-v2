@@ -12,6 +12,7 @@ export default function VerificationPage({ verification }) {
   useEffect(() => {
     const { sessionId } = router.query;
     if (sessionId) {
+      console.log('Session ID:', sessionId);
       setSessionId(sessionId);
       pollStatus(sessionId);
     }
@@ -23,7 +24,8 @@ export default function VerificationPage({ verification }) {
       try {
         const response = await fetch(statusUrl);
         const data = await response.json();
-        if (data.status === 'successful' && data.proof) {
+        console.log('Status response:', data);
+        if (data.status === 'SUCCESFULL' && data.proof) {
           clearInterval(pollInterval);
           await handleSuccess(data.proof);
         }
