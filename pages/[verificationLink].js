@@ -71,17 +71,16 @@ export default function VerificationPage({ verification }) {
       const reclaimClient = new Reclaim.ProofRequest(APP_ID);
       const reclaimClientJson = reclaimClient.toJsonString()
       const sessionId = JSON.parse(reclaimClientJson).sessionId
-      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}/${sessionId}`;
-      reclaimClient.setRedirectUrl(`${redirectUrl}`);
       setSessionId(sessionId)
+      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
+      reclaimClient.setRedirectUrl(`${redirectUrl}?sessionId=${sessionId}`);
       await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
       reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
-     
 
       const { requestUrl } = await reclaimClient.createVerificationRequest();
-      
-      // // Redirect the user to the Reclaim verification page
-      // window.location.href = requestUrl;
+
+      // Redirect the user to the Reclaim verification page
+      window.location.href = requestUrl;
     } catch (error) {
       console.error('Error starting verification:', error);
       setIsVerifying(false);
@@ -97,7 +96,7 @@ export default function VerificationPage({ verification }) {
     <div className='h-screen bg-white text-black p-10 flex flex-col items-enter'>
       <h1 className='text-2xl font-semibold'>ReVal Verification</h1>
       <p className='mt-4'>Group ID: {verification.groupId}</p>
-      
+
       <p>Verification Status: {verification.verificationStatus ? 'Verified' : 'Not Verified'}</p>
       <p>Verification Type: via GitHub</p>
       {!verification.verificationStatus && !sessionId && (
@@ -127,10 +126,9 @@ export async function getServerSideProps(context) {
   await dbConnect();
   const { verificationLink } = context.params;
   const verification = await Verification.findOne({ verificationLink });
-  
+
   return {
     props: {
       verification: JSON.parse(JSON.stringify(verification)),
     },
   };
-}
