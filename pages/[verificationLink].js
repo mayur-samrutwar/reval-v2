@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { ReclaimProofRequest } from '@reclaimprotocol/js-sdk';
+import { Reclaim } from '@reclaimprotocol/js-sdk';
 import dbConnect from '../lib/dbConnect';
 import Verification from '@/models/Verification';
 
@@ -68,29 +68,20 @@ export default function VerificationPage({ verification }) {
     try {
       const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
       const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
-      const reclaimClient = await ReclaimProofRequest.init(APP_ID, APP_SECRET, process.env.NEXT_PUBLIC_APP_PROVIDER, { log: false, acceptAiProviders: true });
-      const reclaimClientJson = reclaimClient.toJsonString();
-      const sessionId = JSON.parse(reclaimClientJson).sessionId;
-      setSessionId(sessionId);
-      
-      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}?sessionId=${sessionId}`;
-      reclaimClient.setRedirectUrl(redirectUrl);
-      
-      const requestUrl = await reclaimClient.getRequestUrl();
-      
-      // Redirect the user to the Reclaim verification page
-      window.location.href = requestUrl;
+      const reclaimClient = new Reclaim.ProofRequest(APP_ID);
+      const reclaimClientJson = reclaimClient.toJsonString()
+      const sessionId = JSON.parse(reclaimClientJson).sessionId
+      const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}/${sessionId}`;
+      reclaimClient.setRedirectUrl(`${redirectUrl}`);
+      setSessionId(sessionId)
+      await reclaimClient.buildProofRequest(process.env.NEXT_PUBLIC_APP_PROVIDER, true, 'V2Linking');
+      reclaimClient.setSignature(await reclaimClient.generateSignature(APP_SECRET));
+     
 
-      await reclaimClient.startSession({
-        onSuccess: async (proof) => {
-          console.log('Verification success', proof);
-          await handleSuccess(proof);
-        },
-        onError: error => {
-          console.error('Verification failed', error);
-          setProofStatus('failed');
-        }
-      });
+      const { requestUrl } = await reclaimClient.createVerificationRequest();
+      
+      // // Redirect the user to the Reclaim verification page
+      // window.location.href = requestUrl;
     } catch (error) {
       console.error('Error starting verification:', error);
       setIsVerifying(false);
