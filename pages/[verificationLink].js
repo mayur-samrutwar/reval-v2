@@ -69,7 +69,7 @@ export default function VerificationPage({ verification }) {
       const APP_ID = process.env.NEXT_PUBLIC_APP_ID;
       const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET;
       const reclaimClient = new Reclaim.ProofRequest(APP_ID);
-      const reclaimClientJson = reclaimClient.toJsonString()
+      const reclaimClientJson = reclaimClient.toJsonString();
       const sessionId = JSON.parse(reclaimClientJson).sessionId
       setSessionId(sessionId)
       const redirectUrl = `https://reval-v2.vercel.app/${verification.verificationLink}`;
@@ -131,4 +131,5 @@ export async function getServerSideProps(context) {
     props: {
       verification: JSON.parse(JSON.stringify(verification)),
     },
-  };
+  }
+}
