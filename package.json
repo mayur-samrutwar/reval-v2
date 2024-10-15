@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@reclaimprotocol/js-sdk": "^1.3.11",
+    "@reclaimprotocol/js-sdk": "^2.0.2",
     "mongodb": "^6.8.0",
     "mongoose": "^8.5.2",
     "next": "14.2.5",
